@@ -4,11 +4,9 @@ import requests
 
 app = FastAPI()
 
-# Llama.cpp endpoint
-LLM_ENDPOINT = "https://j23fwcijsc3m3e-5000.proxy.runpod.net/v1/completions"
-# LLM_ENDPOINT = "https://j23fwcijsc3m3e-8080.proxy.runpod.net/v1/completions"
+# Use local FastAPI endpoint instead of external proxy
+LLM_ENDPOINT = "http://127.0.0.1:8000/generate"
 
-# Define the Pydantic model for the request body
 class GenerateRequest(BaseModel):
     prompt: str
     max_tokens: int = 200
@@ -33,6 +31,6 @@ async def generate_response(request: GenerateRequest):
         response = requests.post(LLM_ENDPOINT, json=payload, headers=headers, verify=False)
         response.raise_for_status()
         result = response.json()
-        return {"response": result["choices"][0]["text"]}
+        return {"response": result.get("choices", [{}])[0].get("text", "No response")}
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPE
