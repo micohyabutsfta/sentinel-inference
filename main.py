@@ -1,36 +1,24 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import requests
+from fastapi import FastAPI
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import snapshot_download
 
 app = FastAPI()
 
-# Use local FastAPI endpoint instead of external proxy
-LLM_ENDPOINT = "http://127.0.0.1:8000/generate"
+# Load model from Hugging Face
+repo_id = "micohyabutsfta/Sentinel-2.0"
+model_path = snapshot_download(repo_id)  # Downloads the model files locally
 
-class GenerateRequest(BaseModel):
-    prompt: str
-    max_tokens: int = 200
-    temperature: float = 1.0
-    top_p: float = 0.9
-
-@app.get("/")
-def home():
-    return {"message": "Sentinel API is running!"}
+model = AutoModelForCausalLM.from_pretrained(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 @app.post("/generate")
-async def generate_response(request: GenerateRequest):
-    payload = {
-        "prompt": request.prompt,
-        "max_tokens": request.max_tokens,
-        "temperature": request.temperature,
-        "top_p": request.top_p
-    }
-    headers = {"Content-Type": "application/json"}
+async def generate(prompt: str):
+    inputs = tokenizer(prompt, return_tensors="pt")
+    output = model.generate(**inputs)
+    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    return {"response": response}
 
-    try:
-        response = requests.post(LLM_ENDPOINT, json=payload, headers=headers, verify=False)
-        response.raise_for_status()
-        result = response.json()
-        return {"response": result.get("choices", [{}])[0].get("text", "No response")}
-    except requests.exceptions.RequestException as e:
-        raise HTTPE
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
